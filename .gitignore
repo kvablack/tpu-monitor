@@ -350,5 +350,4 @@ tags
 .history
 .ionide
 
-index.html
-!templates/*.html
+serve/index.html
