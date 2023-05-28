@@ -20,7 +20,7 @@ LSOF_COLUMN_NAMES = [
     "NAME",
 ]
 
-TIMEOUT = 10  # seconds
+TIMEOUT = 30  # seconds
 
 RUN_FREQUENCY = 60 * 5  # seconds
 
@@ -40,13 +40,12 @@ class VM:
 
     async def update_usage(self):
         print(f"Updating {self.name}")
-        proc = await asyncio.create_subprocess_shell(
-            TPU_USAGE_CMD.format(name=self.name, zone=self.zone),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-
         async with asyncio.timeout(TIMEOUT):
+            proc = await asyncio.create_subprocess_shell(
+                TPU_USAGE_CMD.format(name=self.name, zone=self.zone),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
             stdout, stderr = await proc.communicate()
 
         if proc.returncode != 0 and not stdout:
@@ -103,28 +102,31 @@ class VM:
 
 
 async def main(vms: List[VM]):
-    results = await asyncio.gather(
-        *[vm.update_usage() for vm in vms],
-        return_exceptions=True,
-    )
+    while True:
+        results = await asyncio.gather(
+            *[vm.update_usage() for vm in vms],
+            return_exceptions=True,
+        )
 
-    for vm, result in zip(vms, results):
-        if isinstance(result, Exception):
-            print(f"Error updating {vm.name}: {result}")
-            vm.usage = None
-        else:
-            print(f"Successfully updated {vm.name}")
+        for vm, result in zip(vms, results):
+            if isinstance(result, Exception):
+                print(f"Error updating {vm.name}: {result}")
+                vm.usage = None
+            else:
+                print(f"Successfully updated {vm.name}")
 
-    vm_types = sorted(set(vm.type for vm in vms))
-    vm_groups = {
-        vm_type: [vm for vm in vms if vm.type == vm_type] for vm_type in vm_types
-    }
+        vm_types = sorted(set(vm.type for vm in vms))
+        vm_groups = {
+            vm_type: [vm for vm in vms if vm.type == vm_type] for vm_type in vm_types
+        }
 
-    template_loader = jinja2.FileSystemLoader(searchpath="./templates")
-    template_env = jinja2.Environment(loader=template_loader)
-    template = template_env.get_template("index.html")
-    with open("index.html", "w") as f:
-        f.write(template.render(vm_groups=vm_groups))
+        template_loader = jinja2.FileSystemLoader(searchpath="./templates")
+        template_env = jinja2.Environment(loader=template_loader)
+        template = template_env.get_template("index.html")
+        with open("serve/index.html", "w") as f:
+            f.write(template.render(vm_groups=vm_groups))
+
+        await asyncio.sleep(RUN_FREQUENCY)
 
 
 if __name__ == "__main__":
@@ -133,6 +135,4 @@ if __name__ == "__main__":
         reader = csv.DictReader(f)
         vms = [VM(**row) for row in reader]
 
-    while True:
-        asyncio.run(main(vms))
-        time.sleep(RUN_FREQUENCY)
+    asyncio.run(main(vms))
