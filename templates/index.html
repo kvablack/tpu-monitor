@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>RAIL TPU Monitor</title>
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway|Open+Sans">
+</head>
+
+<body>
+    <div class="container">
+        <h1>RAIL TPU Monitor</h1>
+        {% for group_name, vms in vm_groups.items() %}
+            <h2>{{ group_name }} TPUs</h2>
+            <hr/>
+            <div class="vm-container">
+                {% for vm in vms|sort(attribute="name") %}
+                    <h3>{{ vm.name }}</h3>
+                    <div class="chip-container">
+                        {% if vm.usage %}
+                            {% for chip_id, chip in vm.usage|dictsort %}
+                                {% if chip.user %}
+                                    <div class="chip-used">
+                                        chip {{ chip_id }}: used by <span class="user">{{ chip.user }}</span> for at least <span class="time" data-time="{{ chip.last_updated.isoformat() }}"></span>
+                                    </div>
+                                {% else %}
+                                    <div class="chip-unused">
+                                        chip {{ chip_id }}: <span class="user">unused</span> for at least <span class="time" data-time="{{ chip.last_updated.isoformat() }}"></span>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        {% else %}
+                            <div class="error">error communicating with TPU</div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endfor %}
+    </div>
+
+    <script>
+        function updateTime() {
+            var times = document.getElementsByClassName('time');
+            for (var i = 0; i < times.length; i++) {
+                var time = times[i];
+                var timeStr = time.getAttribute('data-time');
+                var date = new Date(timeStr);
+                var now = new Date();
+                var diff = now - date;
+                var seconds = Math.floor(diff / 1000);
+                var minutes = Math.floor(seconds / 60);
+                var hours = Math.floor(minutes / 60);
+                var days = Math.floor(hours / 24);
+                var timeStr = '';
+                if (days > 0) {
+                    timeStr += days + (days == 1 ? ' day' : ' days') + (hours % 24 > 0 ? ', ' : '')
+                }
+                if (hours % 24 > 0) {
+                    timeStr += (hours % 24) + (hours % 24 == 1 ? ' hour' : ' hours') + (minutes % 60 > 0 ? ', ' : '')
+                }
+                if (minutes % 60 > 0) {
+                    timeStr += (minutes % 60) + (minutes % 60 == 1 ? ' minute' : ' minutes') + (seconds % 60 > 0 ? ', ' : '')
+                }
+                if (seconds % 60 > 0) {
+                    timeStr += (seconds % 60) + (seconds % 60 == 1 ? ' second' : ' seconds')
+                }
+                time.innerHTML = timeStr;
+            }
+        }
+        updateTime();
+        setInterval(updateTime, 5000);
+    </script>
+
+</html>

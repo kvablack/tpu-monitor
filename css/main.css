@@ -1,0 +1,46 @@
+.container {
+    width: 100%;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+h1 {
+    text-align: center;
+    font-weight: 800;
+    font-family: "Raleway", sans-serif;
+    font-variant-ligatures: no-common-ligatures;
+}
+
+body {
+    font-family: "Open Sans", sans-serif;
+}
+
+h2 {
+    margin-bottom: 0.3rem;
+}
+
+h3 {
+    margin-top: 0.5rem;
+    margin-bottom: 0;
+}
+
+.user {
+    font-weight: bold;
+}
+
+.vm-container {
+    margin-left: 1rem;
+    margin-bottom: 2rem;
+}
+
+.chip-container {
+    margin-left: 1rem;
+}
+
+.chip-used, .error {
+    color: #9f0000;
+}
+
+.chip-unused {
+    color: #006400;
+}

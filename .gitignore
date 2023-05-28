@@ -350,19 +350,5 @@ tags
 .history
 .ionide
 
-### Web ###
-*.asp
-*.cer
-*.csr
-*.css
-*.htm
-*.html
-*.js
-*.jsp
-*.php
-*.rss
-*.wasm
-*.wat
-*.xhtml
-
-# End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,vim,emacs,jetbrains+all,python,web
+index.html
+!templates/*.html
