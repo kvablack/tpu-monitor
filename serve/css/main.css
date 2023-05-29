@@ -9,10 +9,30 @@ h1 {
     font-weight: 800;
     font-family: "Raleway", sans-serif;
     font-variant-ligatures: no-common-ligatures;
+    margin-bottom: 0.2rem;
 }
 
 body {
     font-family: "Open Sans", sans-serif;
+}
+
+a {
+    color: #0055AA;
+    text-decoration: inherit;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+a:visited {
+    color: #0055AA;
+}
+
+.subtitle {
+    font-size: 11pt;
+    text-align: center;
+    margin: 0 auto;
 }
 
 h2 {
