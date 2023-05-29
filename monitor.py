@@ -4,7 +4,6 @@ import csv
 import datetime
 from typing import Dict, List, Optional
 import jinja2
-import time
 
 TPU_USAGE_CMD = "gcloud compute tpus tpu-vm ssh --zone={zone} --command='sudo ls /dev/accel*; sudo lsof -w /dev/accel*' {name}"
 
@@ -28,7 +27,7 @@ RUN_FREQUENCY = 60 * 5  # seconds
 @dataclass
 class Chip:
     user: Optional[str]
-    last_updated: datetime.datetime
+    last_changed: datetime.datetime
 
 
 @dataclass
@@ -72,7 +71,9 @@ class VM:
                 f"Unexpected chips: {set(self.usage.keys())} != {chips}\n\n{stdout.decode()}"
             )
 
-        new_usage = {chip: Chip(None, datetime.datetime.now()) for chip in chips}
+        chip_to_user: Dict[int, Optional[str]] = {
+            chip: None for chip in chips
+        }  # chip(int) -> user(str)
 
         # in case of no lsof output
         if line:
@@ -82,23 +83,32 @@ class VM:
                     continue
                 user = line.split()[2]
                 chip = int(line.split()[-1][len("/dev/accel") :])
-                if chip not in new_usage:
+                if chip not in chip_to_user:
                     raise Exception(
                         f"Unexpected chip: {line.split()[-1][len('/dev/accel'):]}\n\n{stdout.decode()}"
                     )
-                if new_usage[chip].user is not None and new_usage[chip].user != user:
+                if chip_to_user[chip] is not None and chip_to_user[chip] != user:
                     raise Exception(
-                        f"Multiple users on same chip: found {user} and {new_usage[chip].user} on chip {chip}\n\n{stdout.decode()}"
+                        f"Multiple users on same chip: found {user} and {chip_to_user[chip]} on chip {chip}\n\n{stdout.decode()}"
                     )
-                new_usage[chip].user = user
+                chip_to_user[chip] = user
 
         if self.usage:
+            if set(chip_to_user.keys()) != set(self.usage.keys()):
+                raise Exception(
+                    f"Chips changed: {set(self.usage.keys())} != {set(chip_to_user.keys())}\n\n{stdout.decode()}"
+                )
+
             # update timestamps only if user has changed
-            for chip in new_usage:
-                if new_usage[chip].user != self.usage[chip].user:
-                    self.usage[chip] = new_usage[chip]
+            for chip in chip_to_user:
+                if chip_to_user[chip] != self.usage[chip].user:
+                    self.usage[chip] = Chip(chip_to_user[chip], datetime.datetime.now())
         else:
-            self.usage = new_usage
+            # this is the first update
+            self.usage = {
+                chip: Chip(chip_to_user[chip], datetime.datetime.now())
+                for chip in chip_to_user
+            }
 
 
 async def main(vms: List[VM]):
@@ -124,7 +134,7 @@ async def main(vms: List[VM]):
         template_env = jinja2.Environment(loader=template_loader)
         template = template_env.get_template("index.html")
         with open("serve/index.html", "w") as f:
-            f.write(template.render(vm_groups=vm_groups))
+            f.write(template.render(vm_groups=vm_groups, now=datetime.datetime.now()))
 
         await asyncio.sleep(RUN_FREQUENCY)
 

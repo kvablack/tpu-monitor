@@ -37,11 +37,18 @@ a:visited {
 
 h2 {
     margin-bottom: 0.3rem;
+    display: inline;
 }
 
 h3 {
     margin-top: 0.5rem;
     margin-bottom: 0;
+}
+
+.last-updated {
+    font-size: 11pt;
+    color: #666;
+    margin-left: 0.5rem;
 }
 
 .user {

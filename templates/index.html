@@ -15,6 +15,7 @@
         <div class="subtitle">[<a href="https://github.com/kvablack/tpu-monitor">source code</a>]</div>
         {% for group_name, vms in vm_groups.items() %}
             <h2>{{ group_name }} TPUs</h2>
+            <span class="last-updated">last updated <span class="time" data-time="{{ now.isoformat() }}"></span> ago</span>
             <hr/>
             <div class="vm-container">
                 {% for vm in vms|sort(attribute="name") %}
@@ -24,11 +25,11 @@
                             {% for chip_id, chip in vm.usage|dictsort %}
                                 {% if chip.user %}
                                     <div class="chip-used">
-                                        chip {{ chip_id }}: used by <span class="user">{{ chip.user }}</span> for at least <span class="time" data-time="{{ chip.last_updated.isoformat() }}"></span>
+                                        chip {{ chip_id }}: used by <span class="user">{{ chip.user }}</span> for at least <span class="time" data-time="{{ chip.last_changed.isoformat() }}" data-now="{{ now.isoformat() }}"></span>
                                     </div>
                                 {% else %}
                                     <div class="chip-unused">
-                                        chip {{ chip_id }}: <span class="user">unused</span> for at least <span class="time" data-time="{{ chip.last_updated.isoformat() }}"></span>
+                                        chip {{ chip_id }}: <span class="user">unused</span> for at least <span class="time" data-time="{{ chip.last_changed.isoformat() }}" data-now="{{ now.isoformat() }}"></span>
                                     </div>
                                 {% endif %}
                             {% endfor %}
@@ -43,17 +44,21 @@
 
     <script>
         function updateTime() {
-            var times = document.getElementsByClassName('time');
-            for (var i = 0; i < times.length; i++) {
-                var time = times[i];
-                var timeStr = time.getAttribute('data-time');
-                var date = new Date(timeStr);
-                var now = new Date();
-                var diff = now - date;
-                var seconds = Math.floor(diff / 1000);
-                var minutes = Math.floor(seconds / 60);
-                var hours = Math.floor(minutes / 60);
-                var days = Math.floor(hours / 24);
+            const times = document.getElementsByClassName('time');
+            for (const time of times) {
+                const date = new Date(time.getAttribute('data-time'));
+                const now = time.hasAttribute('data-now') ? new Date(time.getAttribute('data-now')) : new Date();
+                const diff = now - date;
+
+                if (diff < 1000) {
+                    time.innerHTML = '0 seconds';
+                    continue;
+                }
+
+                const seconds = Math.floor(diff / 1000);
+                const minutes = Math.floor(seconds / 60);
+                const hours = Math.floor(minutes / 60);
+                const days = Math.floor(hours / 24);
                 var timeStr = '';
                 if (days > 0) {
                     timeStr += days + (days == 1 ? ' day' : ' days') + (hours % 24 > 0 || minutes % 60 > 0 || seconds % 60 > 0 ? ', ' : '')
@@ -71,7 +76,7 @@
             }
         }
         updateTime();
-        setInterval(updateTime, 5000);
+        setInterval(updateTime, 1000);
     </script>
 
 </html>
