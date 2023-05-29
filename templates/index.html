@@ -55,10 +55,10 @@
                 var days = Math.floor(hours / 24);
                 var timeStr = '';
                 if (days > 0) {
-                    timeStr += days + (days == 1 ? ' day' : ' days') + (hours % 24 > 0 ? ', ' : '')
+                    timeStr += days + (days == 1 ? ' day' : ' days') + (hours % 24 > 0 || minutes % 60 > 0 || seconds % 60 > 0 ? ', ' : '')
                 }
                 if (hours % 24 > 0) {
-                    timeStr += (hours % 24) + (hours % 24 == 1 ? ' hour' : ' hours') + (minutes % 60 > 0 ? ', ' : '')
+                    timeStr += (hours % 24) + (hours % 24 == 1 ? ' hour' : ' hours') + (minutes % 60 > 0 || seconds % 60 > 0 ? ', ' : '')
                 }
                 if (minutes % 60 > 0) {
                     timeStr += (minutes % 60) + (minutes % 60 == 1 ? ' minute' : ' minutes') + (seconds % 60 > 0 ? ', ' : '')

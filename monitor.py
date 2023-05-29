@@ -110,7 +110,7 @@ async def main(vms: List[VM]):
 
         for vm, result in zip(vms, results):
             if isinstance(result, Exception):
-                print(f"Error updating {vm.name}: {result}")
+                print(f"Error updating {vm.name}: {type(result)}: {result}")
                 vm.usage = None
             else:
                 print(f"Successfully updated {vm.name}")
