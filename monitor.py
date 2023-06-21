@@ -102,11 +102,11 @@ class VM:
             # update timestamps only if user has changed
             for chip in chip_to_user:
                 if chip_to_user[chip] != self.usage[chip].user:
-                    self.usage[chip] = Chip(chip_to_user[chip], datetime.datetime.now())
+                    self.usage[chip] = Chip(chip_to_user[chip], datetime.datetime.now(datetime.timezone.utc))
         else:
             # this is the first update
             self.usage = {
-                chip: Chip(chip_to_user[chip], datetime.datetime.now())
+                chip: Chip(chip_to_user[chip], datetime.datetime.now(datetime.timezone.utc))
                 for chip in chip_to_user
             }
 
@@ -134,7 +134,7 @@ async def main(vms: List[VM]):
         template_env = jinja2.Environment(loader=template_loader)
         template = template_env.get_template("index.html")
         with open("serve/index.html", "w") as f:
-            f.write(template.render(vm_groups=vm_groups, now=datetime.datetime.now()))
+            f.write(template.render(vm_groups=vm_groups, now=datetime.datetime.now(datetime.timezone.utc)))
 
         await asyncio.sleep(RUN_FREQUENCY)
 
