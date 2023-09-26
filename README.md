@@ -18,11 +18,13 @@ All this does is run:
 Open dashboard on: http://0.0.0.0:8000/
 
 
-**(Add-on) Monitor custom TPU VMs**
+## Configurations
+
+**1. Monitor custom TPU VMs**
 
 Optionally, you can specify which TPU by editing the `config/vms.csv` file, and parse the file path to `monitor.py` as an argument.
 
-**(Add-on) Monitor custom filestores**
+**2. Monitor custom filestores**
 
 In the `config/config.yaml` file, you can specify the list of filestore paths you want to monitor. e.g. `"filestore_paths": ["/mnt/nfs1", "/mnt/nfs2"]`
 
