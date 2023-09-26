@@ -3,6 +3,7 @@
 import os
 import asyncio
 
+
 async def get_size(path: str) -> str:
     """
     Asynchronously get the size of a directory using `du`.
@@ -14,6 +15,7 @@ async def get_size(path: str) -> str:
     )
     stdout, _ = await process.communicate()
     return stdout.decode().strip()
+
 
 def size_to_bytes(size: str) -> int:
     """
@@ -30,6 +32,7 @@ def size_to_bytes(size: str) -> int:
         return int(float(size.replace("T", "")) * 1024**4)
     return int(size)
 
+
 async def async_get_sorted_sizes(base_path: str) -> list:
     """
     Asynchronously get sizes of all subdirectories under `base_path`
@@ -37,26 +40,27 @@ async def async_get_sorted_sizes(base_path: str) -> list:
     """
     # Get all subdirectories under the base_path
     directories = [
-        dir_ for dir_ in os.listdir(base_path) 
-        if os.path.isdir(os.path.join(base_path, dir_)) and \
-            not dir_.startswith('.')
+        dir_ for dir_ in os.listdir(base_path)
+        if os.path.isdir(os.path.join(base_path, dir_)) and
+        not dir_.startswith('.')
     ]
 
     if not directories:
         return []
 
     paths = [os.path.join(base_path, dir_) for dir_ in directories]
-    
+
     # Gather sizes asynchronously
     sizes = await asyncio.gather(*(get_size(path) for path in paths))
 
     # Split size from path and sort
     sorted_sizes = sorted(
-        [(size.split("\t")[0], size.split("\t")[1]) for size in sizes], 
-        key=lambda x: size_to_bytes(x[0]), 
+        [(size.split("\t")[0], size.split("\t")[1]) for size in sizes],
+        key=lambda x: size_to_bytes(x[0]),
         reverse=True
     )
     return sorted_sizes
+
 
 def main():
     path = os.path.expanduser('~/')
@@ -64,6 +68,7 @@ def main():
     for size, path in sorted_sizes:
         print(f"{size} - {path}")
     print(f"Total: {len(sorted_sizes)}")
+
 
 if __name__ == "__main__":
     main()

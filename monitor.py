@@ -27,8 +27,12 @@ LSOF_COLUMN_NAMES = [
 ]
 
 TIMEOUT = 30  # seconds
+TOP_K_LARGEST_DIRS = 15     # top k largest directories to display
+RUN_VM_FREQUENCY = 60 * 5   # seconds
+RUN_FS_FREQUENCY = 60 * 30  # seconds
 
-RUN_FREQUENCY = 60 * 5  # seconds
+
+##############################################################################
 
 
 @dataclass
@@ -70,7 +74,7 @@ class VM:
             line = next(out)
             if not line.startswith("/dev/accel"):
                 break
-            chips.add(int(line[len("/dev/accel") :]))
+            chips.add(int(line[len("/dev/accel"):]))
 
         # the next line is the lsof column names
         if not chips or (line and line.split() != LSOF_COLUMN_NAMES):
@@ -92,7 +96,7 @@ class VM:
                 if not line:
                     continue
                 user = line.split()[2]
-                chip = int(line.split()[-1][len("/dev/accel") :])
+                chip = int(line.split()[-1][len("/dev/accel"):])
                 if chip not in chip_to_user:
                     raise Exception(
                         f"Unexpected chip: {line.split()[-1][len('/dev/accel'):]}\n\n{stdout.decode()}"
@@ -128,10 +132,10 @@ def create_vms_from_all_zones() -> List[VM]:
     # Get the list of all TPU locations
     cmd_locations = "gcloud compute tpus locations list"
     locations_output = subprocess.check_output(cmd_locations, shell=True).decode('utf-8')
-    
+
     # Split the output by lines and skip the header
     locations_lines = locations_output.split("\n")[1:]
-    
+
     # Extract the zone names from the output
     zones = [line.split()[0] for line in locations_lines if line]
 
@@ -162,11 +166,13 @@ class Monitor:
         self.vms = vms
         self.vm_update_freq = vm_update_freq
         self.fs_update_freq = fs_update_freq
+
+        # Track for writing to html
         self.vm_groups = None
         self.fs_results = None
-        self.fs_time = datetime.datetime.now(datetime.timezone.utc)
-        self.vm_time = datetime.datetime.now(datetime.timezone.utc)
-    
+        self.fs_now = datetime.datetime.now(datetime.timezone.utc)
+        self.vm_now = datetime.datetime.now(datetime.timezone.utc)
+
     async def update_vms(self, vms: List[VM], vm_update_freq: int):
         """
         VM update loop.
@@ -193,10 +199,9 @@ class Monitor:
                 vm_type: [vm for vm in vms if vm.type == vm_type] for vm_type in vm_types
             }
             self.vm_groups = vm_groups
-            self.vm_time = datetime.datetime.now(datetime.timezone.utc)
+            self.vm_now = datetime.datetime.now(datetime.timezone.utc)
             self.write_to_html()
             await asyncio.sleep(vm_update_freq)
-
 
     async def update_fss(self, dir_paths: List[str], fs_update_freq: int):
         """
@@ -209,8 +214,10 @@ class Monitor:
         while True:
             results = await asyncio.gather(
                 *[async_get_sorted_sizes(path) for path in dir_paths],
-                return_exceptions=True,
             )
+
+            # get the top k largest directories
+            results = [result[:TOP_K_LARGEST_DIRS] for result in results]
 
             # Create a dictionary for the results
             filestore_dict = {}
@@ -220,11 +227,10 @@ class Monitor:
                 filestore_dict[directory_name] = result[:15]
 
             self.fs_results = filestore_dict
-            self.fs_time = datetime.datetime.now(datetime.timezone.utc)
+            self.fs_now = datetime.datetime.now(datetime.timezone.utc)
             self.write_to_html()
             print(f"Successfully updated filestores")
             await asyncio.sleep(fs_update_freq)
-
 
     def write_to_html(self):
         """
@@ -237,28 +243,31 @@ class Monitor:
             f.write(template.render(
                 filestore_results=self.fs_results,
                 vm_groups=self.vm_groups,
-                vm_now=self.vm_time,
-                fs_now=self.fs_time,
+                vm_now=self.vm_now,
+                fs_now=self.fs_now,
             ))
 
 
 async def main(vms: List[VM], fss: List[str],
                vm_update_freq: int, fs_update_freq: int):
-    
+
     monitor = Monitor(vms, vm_update_freq, fs_update_freq)
     vm_updater = asyncio.create_task(monitor.update_vms(vms, vm_update_freq))
     fs_updater = asyncio.create_task(monitor.update_fss(fss, fs_update_freq))
 
     # run until either vm_updater or fs_updater finishes
-    await asyncio.gather(vm_updater, fs_updater)    
+    await asyncio.gather(vm_updater, fs_updater)
 
+
+##############################################################################
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--csv", default="config/vms.csv")
     parser.add_argument("--config", default="config/config.yaml")
     parser.add_argument("--all_zones", action="store_true")
-    parser.add_argument("--freq", default=RUN_FREQUENCY, type=int)
+    parser.add_argument("--vm_freq", default=RUN_VM_FREQUENCY, type=int)
+    parser.add_argument("--fs_freq", default=RUN_FS_FREQUENCY, type=int)
     args = parser.parse_args()
 
     if args.all_zones:
@@ -267,10 +276,10 @@ if __name__ == "__main__":
         with open(args.csv) as f:
             reader = csv.DictReader(f)
             vms = [VM(**row) for row in reader]
-            
+
     # read filestore paths from config
     with open(args.config) as f:
         config = yaml.safe_load(f)
         fss = config["filestore_paths"]
 
-    asyncio.run(main(vms, fss, args.freq, args.freq))
+    asyncio.run(main(vms, fss, args.vm_freq, args.fs_freq))
