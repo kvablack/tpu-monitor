@@ -8,6 +8,9 @@ import subprocess
 from typing import Dict, List, Optional, List
 import argparse
 import jinja2
+from filestore import async_get_sorted_sizes
+import yaml
+import os
 
 TPU_USAGE_CMD = "gcloud compute tpus tpu-vm ssh --zone={zone} --command='sudo ls /dev/accel*; sudo lsof -w /dev/accel*' {name}"
 
@@ -154,39 +157,106 @@ def create_vms_from_all_zones() -> List[VM]:
     return vms
 
 
-async def main(vms: List[VM], run_frequency: int):
-    while True:
-        results = await asyncio.gather(
-            *[vm.update_usage() for vm in vms],
-            return_exceptions=True,
-        )
+class Monitor:
+    def __init__(self, vms: List[VM], vm_update_freq: int, fs_update_freq: int):
+        self.vms = vms
+        self.vm_update_freq = vm_update_freq
+        self.fs_update_freq = fs_update_freq
+        self.vm_groups = None
+        self.fs_results = None
+        self.fs_time = datetime.datetime.now(datetime.timezone.utc)
+        self.vm_time = datetime.datetime.now(datetime.timezone.utc)
+    
+    async def update_vms(self, vms: List[VM], vm_update_freq: int):
+        """
+        VM update loop.
+        """
+        if len(vms) == 0:
+            print("WARNING! No VMs to update")
+            return
 
-        for vm, result in zip(vms, results):
-            if isinstance(result, Exception):
-                print(f"Error updating {vm.name}: {type(result)}: {result}")
-                vm.usage = None
-            else:
-                print(f"Successfully updated {vm.name}")
+        while True:
+            results = await asyncio.gather(
+                *[vm.update_usage() for vm in vms],
+                return_exceptions=True,
+            )
 
-        vm_types = sorted(set(vm.type for vm in vms))
-        vm_groups = {
-            vm_type: [vm for vm in vms if vm.type == vm_type] for vm_type in vm_types
-        }
+            for vm, result in zip(vms, results):
+                if isinstance(result, Exception):
+                    print(f"Error updating {vm.name}: {type(result)}: {result}")
+                    vm.usage = None
+                else:
+                    print(f"Successfully updated {vm.name}")
 
+            vm_types = sorted(set(vm.type for vm in vms))
+            vm_groups = {
+                vm_type: [vm for vm in vms if vm.type == vm_type] for vm_type in vm_types
+            }
+            self.vm_groups = vm_groups
+            self.vm_time = datetime.datetime.now(datetime.timezone.utc)
+            self.write_to_html()
+            await asyncio.sleep(vm_update_freq)
+
+
+    async def update_fss(self, dir_paths: List[str], fs_update_freq: int):
+        """
+        Filestore update loop.
+        """
+        if len(dir_paths) == 0:
+            print("WARNING! No filestores to update")
+            return
+
+        while True:
+            results = await asyncio.gather(
+                *[async_get_sorted_sizes(path) for path in dir_paths],
+                return_exceptions=True,
+            )
+
+            # Create a dictionary for the results
+            filestore_dict = {}
+            for path, result in zip(dir_paths, results):
+                # Use the directory name as the key (or some other identifier)
+                directory_name = os.path.basename(path)
+                filestore_dict[directory_name] = result[:15]
+
+            self.fs_results = filestore_dict
+            self.fs_time = datetime.datetime.now(datetime.timezone.utc)
+            self.write_to_html()
+            print(f"Successfully updated filestores")
+            await asyncio.sleep(fs_update_freq)
+
+
+    def write_to_html(self):
+        """
+        Write the results to an html file.
+        """
         template_loader = jinja2.FileSystemLoader(searchpath="./templates")
-        template_env = jinja2.Environment(loader=template_loader)
-        template = template_env.get_template("index.html")
+        temple_env = jinja2.Environment(loader=template_loader)
+        template = temple_env.get_template("index.html")
         with open("serve/index.html", "w") as f:
-            f.write(template.render(vm_groups=vm_groups, now=datetime.datetime.now(datetime.timezone.utc)))
+            f.write(template.render(
+                filestore_results=self.fs_results,
+                vm_groups=self.vm_groups,
+                vm_now=self.vm_time,
+                fs_now=self.fs_time,
+            ))
 
-        await asyncio.sleep(run_frequency)
+
+async def main(vms: List[VM], fss: List[str],
+               vm_update_freq: int, fs_update_freq: int):
+    
+    monitor = Monitor(vms, vm_update_freq, fs_update_freq)
+    vm_updater = asyncio.create_task(monitor.update_vms(vms, vm_update_freq))
+    fs_updater = asyncio.create_task(monitor.update_fss(fss, fs_update_freq))
+
+    # run until either vm_updater or fs_updater finishes
+    await asyncio.gather(vm_updater, fs_updater)    
 
 
 if __name__ == "__main__":
-    # get vm info from csv
-    print("Getting VM info...")
     parser = argparse.ArgumentParser()
     parser.add_argument("--csv", default="config/vms.csv")
+    parser.add_argument("--config", default="config/config.yaml")
     parser.add_argument("--all_zones", action="store_true")
     parser.add_argument("--freq", default=RUN_FREQUENCY, type=int)
     args = parser.parse_args()
@@ -197,5 +267,10 @@ if __name__ == "__main__":
         with open(args.csv) as f:
             reader = csv.DictReader(f)
             vms = [VM(**row) for row in reader]
+            
+    # read filestore paths from config
+    with open(args.config) as f:
+        config = yaml.safe_load(f)
+        fss = config["filestore_paths"]
 
-    asyncio.run(main(vms, args.freq))
+    asyncio.run(main(vms, fss, args.freq, args.freq))

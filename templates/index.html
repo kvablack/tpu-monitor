@@ -13,23 +13,26 @@
     <div class="container">
         <h1>RAIL TPU Monitor</h1>
         <div class="subtitle">[<a href="https://github.com/kvablack/tpu-monitor">source code</a>]</div>
-        {% for group_name, vms in vm_groups.items() %}
-            <h2>{{ group_name }} TPUs</h2>
-            <span class="last-updated">last updated <span class="time" data-time="{{ now.isoformat() }}"></span> ago</span>
-            <hr/>
-            <div class="vm-container">
-                {% for vm in vms|sort(attribute="name") %}
+
+        {# VM Groups Block #}
+        {% if vm_groups %}
+            {% for group_name, vms in vm_groups.items() %}
+                <h2>{{ group_name }} TPUs</h2>
+                <span class="last-updated">last updated <span class="time" data-time="{{ vm_now.isoformat() }}"></span> ago</span>
+                <hr/>
+                <div class="vm-container">
+                    {% for vm in vms|sort(attribute="name") %}
                     <h3>{{ vm.name }}</h3>
                     <div class="chip-container">
                         {% if vm.usage %}
                             {% for chip_id, chip in vm.usage|dictsort %}
                                 {% if chip.user %}
                                     <div class="chip-used">
-                                        chip {{ chip_id }}: used by <span class="user">{{ chip.user }}</span> for at least <span class="time" data-time="{{ chip.last_changed.isoformat() }}" data-now="{{ now.isoformat() }}"></span>
+                                        chip {{ chip_id }}: used by <span class="user">{{ chip.user }}</span> for at least <span class="time" data-time="{{ chip.last_changed.isoformat() }}" data-now="{{ vm_now.isoformat() }}"></span>
                                     </div>
                                 {% else %}
                                     <div class="chip-unused">
-                                        chip {{ chip_id }}: <span class="user">unused</span> for at least <span class="time" data-time="{{ chip.last_changed.isoformat() }}" data-now="{{ now.isoformat() }}"></span>
+                                        chip {{ chip_id }}: <span class="user">unused</span> for at least <span class="time" data-time="{{ chip.last_changed.isoformat() }}" data-now="{{ vm_now.isoformat() }}"></span>
                                     </div>
                                 {% endif %}
                             {% endfor %}
@@ -38,8 +41,26 @@
                         {% endif %}
                     </div>
                 {% endfor %}
-            </div>
-        {% endfor %}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        {# Filestore Block #}
+        {% if filestore_results %}
+            <h2>Filestores</h2>
+            {% for filestore_id, entries in filestore_results.items() %}
+                <h3>{{ filestore_id }}</h3>
+                <span class="last-updated">last updated <span class="time" data-time="{{ fs_now.isoformat() }}"></span> ago</span>
+                <hr/>
+                <div class="filestore-container fs-container">
+                    {% for size, path in entries %}
+                        <div class="filestore-entry">
+                            <strong>Path:</strong> {{ path }} <strong>Size:</strong> {{ size }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endfor %}
+        {% endif %}
     </div>
 
     <script>
