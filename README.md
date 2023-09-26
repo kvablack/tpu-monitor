@@ -1,7 +1,6 @@
 # tpu-monitor
 
 ## Installation
-Requires Python >= 3.11.
 
 ```
 pip install -r requirements.txt
@@ -14,4 +13,8 @@ pip install -r requirements.txt
 
 All this does is run:
 - `python monitor.py`, which periodically writes to `serve/index.html`
-- `python -m http.server -d serve`, which serves the contents of `serve/` on port 8000
+- `python -m http.server -d serve`, which serves the contents of `serve/` on port `8000`
+
+Open dashboard on: http://0.0.0.0:8000/
+
+Optionally, you can specify which TPU by editing the `config/vms.csv` file, and parse the file path to `monitor.py` as an argument.
