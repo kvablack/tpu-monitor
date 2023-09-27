@@ -26,7 +26,7 @@ LSOF_COLUMN_NAMES = [
     "NAME",
 ]
 
-TIMEOUT = 30  # seconds
+TIMEOUT = 15  # seconds
 TOP_K_LARGEST_DIRS = 15     # top k largest directories to display
 RUN_VM_FREQUENCY = 60 * 5   # seconds
 RUN_FS_FREQUENCY = 60 * 30  # seconds
@@ -49,21 +49,26 @@ class VM:
     usage: Optional[Dict[int, Chip]] = None
 
     async def update_usage(self):
-        print(f"Updating {self.name}")
         try:
-            # Wrap the coroutine with asyncio.wait_for
+            # Create the subprocess
             # NOTE: asyncio.timeout(TIMEOUT) is only supported
-            # in python3.11 thus use wait_for
-            proc = await asyncio.wait_for(
-                asyncio.create_subprocess_shell(
-                    TPU_USAGE_CMD.format(name=self.name, zone=self.zone),
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                ),
-                timeout=TIMEOUT  # Set the timeout
+            # in python3.11 thus use asyncio.wait_for()
+            proc = await asyncio.create_subprocess_shell(
+                TPU_USAGE_CMD.format(name=self.name, zone=self.zone),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
-            stdout, stderr = await proc.communicate()
+            # Wrap the coroutine with asyncio.wait_for to enforce the timeout
+            stdout, stderr = await asyncio.wait_for(proc.communicate(),
+                                                    timeout=TIMEOUT)
         except asyncio.TimeoutError:
+            # Kill the subprocess if it's still running after the timeout
+            if proc:
+                try:
+                    proc.terminate()
+                    await proc.wait()
+                except Exception as e:
+                    print(f"Error terminating the process: {e}")
             raise Exception(f"Command timed out after {TIMEOUT} seconds.")
 
         out = iter(stdout.decode().split("\n"))
@@ -182,6 +187,7 @@ class Monitor:
             return
 
         while True:
+            print("Updating VMs")
             results = await asyncio.gather(
                 *[vm.update_usage() for vm in vms],
                 return_exceptions=True,
