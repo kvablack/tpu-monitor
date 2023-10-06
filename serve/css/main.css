@@ -71,3 +71,8 @@ h3 {
 .chip-unused {
     color: #006400;
 }
+
+.fs-container {
+    color: #003366;
+    text-indent: 20px;
+}
